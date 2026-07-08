@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>キーエンス管理システム</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">KEYENCE</span>
+      <span class="brand-sub">管理システム</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="dashboard">ダッシュボード</button>
+      <button class="tab" data-view="inventory">在庫・製品</button>
+      <button class="tab" data-view="customers">顧客・案件</button>
+      <button class="tab" data-view="employees">従業員・勤怠</button>
+    </nav>
+    <div class="header-actions">
+      <button class="btn ghost" id="btnExport" title="全データをJSONで書き出し">エクスポート</button>
+      <button class="btn ghost" id="btnImport" title="JSONを読み込み">インポート</button>
+      <input type="file" id="importFile" accept="application/json" hidden />
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ダッシュボード -->
+    <section class="view active" id="view-dashboard">
+      <h1 class="view-title">ダッシュボード</h1>
+      <div class="cards" id="kpiCards"></div>
+      <div class="panel-grid">
+        <div class="panel">
+          <h2 class="panel-title">在庫アラート（発注点以下）</h2>
+          <div id="lowStockList" class="mini-list"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">進行中の案件</h2>
+          <div id="openDealsList" class="mini-list"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">本日の勤怠状況</h2>
+          <div id="todayAttendance" class="mini-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 在庫・製品 -->
+    <section class="view" id="view-inventory">
+      <div class="view-head">
+        <h1 class="view-title">在庫・製品管理</h1>
+        <div class="view-head-actions">
+          <input class="search" id="inventorySearch" placeholder="型番・製品名で検索…" />
+          <button class="btn primary" id="btnAddProduct">＋ 製品を追加</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="inventoryTable">
+          <thead>
+            <tr>
+              <th>型番</th><th>製品名</th><th>カテゴリ</th>
+              <th class="num">在庫数</th><th class="num">発注点</th>
+              <th class="num">単価(円)</th><th class="num">在庫金額</th>
+              <th>状態</th><th class="actions-col">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 顧客・案件 -->
+    <section class="view" id="view-customers">
+      <div class="view-head">
+        <h1 class="view-title">顧客・案件管理</h1>
+        <div class="view-head-actions">
+          <input class="search" id="customerSearch" placeholder="顧客名・担当者で検索…" />
+          <button class="btn primary" id="btnAddCustomer">＋ 顧客を追加</button>
+          <button class="btn" id="btnAddDeal">＋ 案件を追加</button>
+        </div>
+      </div>
+      <div class="panel-grid two">
+        <div class="panel">
+          <h2 class="panel-title">顧客一覧</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="customerTable">
+              <thead>
+                <tr><th>顧客名</th><th>担当者</th><th>電話</th><th>メール</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">案件一覧</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="dealTable">
+              <thead>
+                <tr><th>案件名</th><th>顧客</th><th class="num">金額(円)</th><th>ステータス</th><th>次アクション日</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 従業員・勤怠 -->
+    <section class="view" id="view-employees">
+      <div class="view-head">
+        <h1 class="view-title">従業員・勤怠管理</h1>
+        <div class="view-head-actions">
+          <input class="search" id="employeeSearch" placeholder="氏名・部署で検索…" />
+          <button class="btn primary" id="btnAddEmployee">＋ 従業員を追加</button>
+        </div>
+      </div>
+      <div class="panel-grid two">
+        <div class="panel">
+          <h2 class="panel-title">従業員一覧 / 打刻</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="employeeTable">
+              <thead>
+                <tr><th>社員番号</th><th>氏名</th><th>部署</th><th>役職</th><th>本日</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">勤怠記録</h2>
+          <div class="filter-row">
+            <input type="date" id="attendanceDate" class="search" />
+            <button class="btn ghost" id="btnClearAttendanceFilter">全期間</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="attendanceTable">
+              <thead>
+                <tr><th>日付</th><th>氏名</th><th>出勤</th><th>退勤</th><th class="num">実働(h)</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- モーダル -->
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h3 id="modalTitle">タイトル</h3>
+        <button class="modal-close" id="modalClose" aria-label="閉じる">×</button>
+      </div>
+      <form id="modalForm" class="modal-form"></form>
+      <div class="modal-foot">
+        <button type="button" class="btn ghost" id="modalCancel">キャンセル</button>
+        <button type="submit" class="btn primary" id="modalSave" form="modalForm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
