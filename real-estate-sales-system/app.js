@@ -33,6 +33,14 @@
   ];
   const dealStageMeta = (v) => DEAL_STAGE.find((s) => s.value === v) || DEAL_STAGE[0];
 
+  // 間取り文字列から居室数を推定（3LDK→3, ワンルーム→1）
+  function layoutRooms(layout) {
+    const m = String(layout || "").match(/(\d+)\s*[SLDK]/i);
+    if (m) return parseInt(m[1], 10);
+    if (/ワンルーム|1R|1K/i.test(layout || "")) return 1;
+    return 0;
+  }
+
   /* ---------- データ層 ---------- */
   const defaultData = () => {
     const a1 = uid(), a2 = uid();
@@ -44,20 +52,19 @@
         { id: a2, code: "S-1002", name: "田中 花子", store: "駅前支店", role: "営業" },
       ],
       properties: [
-        { id: p1, code: "P-2001", name: "グランドレジデンス品川", type: "マンション", address: "東京都港区港南2-1-1", price: 78000000, layout: "3LDK", area: 72.5, status: "active", agentId: a1, photo: "" },
-        { id: p2, code: "P-2002", name: "世田谷 新築戸建", type: "戸建", address: "東京都世田谷区成城6-3-2", price: 96800000, layout: "4LDK", area: 105.2, status: "negotiating", agentId: a2, photo: "" },
-        { id: p3, code: "P-2003", name: "横浜みなとみらい 事業用地", type: "土地", address: "神奈川県横浜市西区みなとみらい4", price: 250000000, layout: "—", area: 480, status: "prep", agentId: a1, photo: "" },
-        { id: p4, code: "P-2004", name: "目黒アーバンフラット", type: "マンション", address: "東京都目黒区中目黒3-2-1", price: 62000000, layout: "2LDK", area: 55.0, status: "sold", agentId: a2, photo: "" },
+        { id: p1, code: "P-2001", name: "グランドレジデンス品川", type: "マンション", address: "東京都港区港南2-1-1", price: 78000000, layout: "3LDK", area: 72.5, status: "active", agentId: a1, media: [] },
+        { id: p2, code: "P-2002", name: "世田谷 新築戸建", type: "戸建", address: "東京都世田谷区成城6-3-2", price: 96800000, layout: "4LDK", area: 105.2, status: "negotiating", agentId: a2, media: [] },
+        { id: p3, code: "P-2003", name: "横浜みなとみらい 事業用地", type: "土地", address: "神奈川県横浜市西区みなとみらい4", price: 250000000, layout: "—", area: 480, status: "prep", agentId: a1, media: [] },
+        { id: p4, code: "P-2004", name: "目黒アーバンフラット", type: "マンション", address: "東京都目黒区中目黒3-2-1", price: 62000000, layout: "2LDK", area: 55.0, status: "sold", agentId: a2, media: [] },
       ],
       customers: [
-        { id: c1, name: "山田 太郎", phone: "090-1234-5678", email: "yamada@example.com", budget: 80000000, wish: "港区・3LDK以上・駅徒歩10分以内" },
-        { id: c2, name: "佐藤 恵子", phone: "080-9876-5432", email: "sato@example.com", budget: 100000000, wish: "戸建・4LDK・世田谷区" },
-        { id: c3, name: "高橋 健", phone: "070-1111-2222", email: "takahashi@example.com", budget: 65000000, wish: "目黒区・2LDK・築浅" },
+        { id: c1, name: "山田 太郎", phone: "090-1234-5678", email: "yamada@example.com", budget: 80000000, prefArea: "港区,品川", prefType: "マンション", minRooms: 3, wish: "駅徒歩10分以内" },
+        { id: c2, name: "佐藤 恵子", phone: "080-9876-5432", email: "sato@example.com", budget: 100000000, prefArea: "世田谷", prefType: "戸建", minRooms: 4, wish: "新築希望" },
+        { id: c3, name: "高橋 健", phone: "070-1111-2222", email: "takahashi@example.com", budget: 65000000, prefArea: "目黒", prefType: "マンション", minRooms: 2, wish: "築浅" },
       ],
       deals: [
         { id: uid(), title: "山田様 品川MS", customerId: c1, propertyId: p1, agentId: a1, amount: 76000000, stage: "viewing", nextDate: "", closeDate: "" },
         { id: uid(), title: "佐藤様 世田谷戸建", customerId: c2, propertyId: p2, agentId: a2, amount: 95000000, stage: "offer", nextDate: "", closeDate: "" },
-        // 成約済（実績サンプル）
         { id: uid(), title: "高橋様 目黒MS", customerId: c3, propertyId: p4, agentId: a2, amount: 61000000, stage: "closed", nextDate: "", closeDate: "2026-06-18" },
         { id: uid(), title: "旧案件A 中央区MS", customerId: c1, propertyId: "", agentId: a1, amount: 84000000, stage: "closed", nextDate: "", closeDate: "2026-05-09" },
         { id: uid(), title: "旧案件B 川崎戸建", customerId: c2, propertyId: "", agentId: a1, amount: 52000000, stage: "closed", nextDate: "", closeDate: "2026-04-22" },
@@ -70,10 +77,27 @@
   let data = load();
   save(); // 初回はシード、以降は読み込んだデータを永続化（冪等）
 
+  // 旧バージョンのデータ形式を移行（単一 photo → media 配列 など）
+  function migrate(d) {
+    (d.properties || []).forEach((p) => {
+      if (!Array.isArray(p.media)) {
+        p.media = p.photo ? [{ id: uid(), url: p.photo, type: "写真" }] : [];
+      }
+      delete p.photo;
+    });
+    (d.customers || []).forEach((c) => {
+      if (c.prefArea == null) c.prefArea = "";
+      if (c.prefType == null) c.prefType = "";
+      if (c.minRooms == null) c.minRooms = 0;
+      if (c.wish == null) c.wish = "";
+    });
+    return d;
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return migrate(JSON.parse(raw));
     } catch (e) { console.warn("load failed", e); }
     return defaultData();
   }
@@ -83,8 +107,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
-      // 画像を多数添付した場合など、容量超過に備える
-      toast("保存に失敗しました（容量超過の可能性）。画像サイズをご確認ください");
+      toast("保存に失敗しました（容量超過の可能性）。画像の枚数やサイズをご確認ください");
       console.warn("save failed", e);
     }
   }
@@ -116,14 +139,27 @@
     backdrop: $("#modalBackdrop"),
     form: $("#modalForm"),
     title: $("#modalTitle"),
+    saveBtn: $("#modalSave"),
+    cancelBtn: $("#modalCancel"),
     onSave: null,
     open(title, fields, values, onSave) {
       this.title.textContent = title;
       this.form.innerHTML = fields.map((f) => fieldHTML(f, values[f.name])).join("");
       this.onSave = onSave;
+      this.saveBtn.style.display = "";
+      this.cancelBtn.textContent = "キャンセル";
       this.backdrop.hidden = false;
       const first = this.form.querySelector("input:not([type=hidden]):not([type=file]), select, textarea");
       if (first) first.focus();
+    },
+    // 読み取り専用の情報モーダル（保存ボタン非表示）
+    openInfo(title, html) {
+      this.title.textContent = title;
+      this.form.innerHTML = html;
+      this.onSave = null;
+      this.saveBtn.style.display = "none";
+      this.cancelBtn.textContent = "閉じる";
+      this.backdrop.hidden = false;
     },
     close() {
       this.backdrop.hidden = true;
@@ -151,12 +187,14 @@
     if (f.type === "textarea") {
       return `<div class="field"><label>${esc(f.label)}</label><textarea name="${f.name}" rows="2" placeholder="${esc(f.placeholder || "")}">${esc(val)}</textarea></div>`;
     }
-    if (f.type === "photo") {
+    if (f.type === "gallery") {
       return `<div class="field"><label>${esc(f.label)}</label>
-        <input type="hidden" name="${f.name}" value="${esc(val)}" />
-        <img class="photo-preview" data-photo-preview="${f.name}" ${val ? `src="${esc(val)}"` : 'style="display:none"'} alt="物件写真プレビュー" />
-        <input type="file" accept="image/*" data-photo-for="${f.name}" />
-        <button type="button" class="btn tiny danger photo-clear" data-photo-clear="${f.name}" ${val ? "" : 'style="display:none"'}>写真を削除</button>
+        <div class="gallery-controls">
+          <input type="file" accept="image/*" multiple data-gallery-add />
+          <select data-gallery-type><option value="写真">写真として追加</option><option value="図面">図面として追加</option></select>
+        </div>
+        <div class="gallery-grid" data-gallery-grid></div>
+        <input type="hidden" name="${f.name}" />
       </div>`;
     }
     const type = f.type || "text";
@@ -164,7 +202,7 @@
     return `<div class="field"><label>${esc(f.label)}</label><input type="${type}" name="${f.name}" value="${esc(val)}" ${step} ${req} placeholder="${esc(f.placeholder || "")}" /></div>`;
   }
 
-  // 写真: 選択されたら 800px 以内に縮小して data URI に変換（localStorage 容量対策）
+  // 画像を maxDim 以内に縮小して data URI に変換（localStorage 容量対策）
   function downscaleImage(file, maxDim, cb) {
     const reader = new FileReader();
     reader.onload = () => {
@@ -187,32 +225,43 @@
     reader.readAsDataURL(file);
   }
 
+  /* ---------- ギャラリー編集（物件モーダル内） ---------- */
+  let galleryItems = [];
+  function renderGallery() {
+    const grid = modal.form.querySelector("[data-gallery-grid]");
+    const hidden = modal.form.querySelector('input[name="media"]');
+    if (!grid || !hidden) return;
+    grid.innerHTML = galleryItems.map((m, i) => `
+      <div class="gallery-cell">
+        <span class="g-kind ${m.type === "図面" ? "zumen" : ""}" data-gallery-kind="${i}" title="クリックで写真/図面を切替">${esc(m.type)}</span>
+        <button type="button" class="g-del" data-gallery-del="${i}" aria-label="削除">×</button>
+        <img src="${esc(m.url)}" data-gallery-view="${i}" alt="${esc(m.type)}" />
+      </div>`).join("");
+    hidden.value = JSON.stringify(galleryItems);
+  }
+
   modal.form.addEventListener("change", (e) => {
-    const fileInput = e.target.closest("input[data-photo-for]");
-    if (!fileInput) return;
-    const name = fileInput.dataset.photoFor;
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) return;
-    downscaleImage(file, 800, (dataUri) => {
-      const hidden = modal.form.querySelector(`input[name="${name}"]`);
-      const preview = modal.form.querySelector(`[data-photo-preview="${name}"]`);
-      const clearBtn = modal.form.querySelector(`[data-photo-clear="${name}"]`);
-      if (hidden) hidden.value = dataUri || "";
-      if (preview && dataUri) { preview.src = dataUri; preview.style.display = ""; }
-      if (clearBtn && dataUri) clearBtn.style.display = "";
+    const add = e.target.closest("input[data-gallery-add]");
+    if (!add) return;
+    const typeSel = modal.form.querySelector("[data-gallery-type]");
+    const kind = typeSel ? typeSel.value : "写真";
+    const files = Array.from(add.files || []);
+    let pending = files.length;
+    files.forEach((file) => {
+      downscaleImage(file, 1000, (dataUri) => {
+        if (dataUri) galleryItems.push({ id: uid(), url: dataUri, type: kind });
+        if (--pending <= 0) renderGallery();
+      });
     });
+    add.value = "";
   });
   modal.form.addEventListener("click", (e) => {
-    const clearBtn = e.target.closest("button[data-photo-clear]");
-    if (!clearBtn) return;
-    const name = clearBtn.dataset.photoClear;
-    const hidden = modal.form.querySelector(`input[name="${name}"]`);
-    const preview = modal.form.querySelector(`[data-photo-preview="${name}"]`);
-    const fileInput = modal.form.querySelector(`input[data-photo-for="${name}"]`);
-    if (hidden) hidden.value = "";
-    if (preview) { preview.src = ""; preview.style.display = "none"; }
-    if (fileInput) fileInput.value = "";
-    clearBtn.style.display = "none";
+    const del = e.target.closest("[data-gallery-del]");
+    const kind = e.target.closest("[data-gallery-kind]");
+    const view = e.target.closest("[data-gallery-view]");
+    if (del) { galleryItems.splice(Number(del.dataset.galleryDel), 1); renderGallery(); }
+    else if (kind) { const i = Number(kind.dataset.galleryKind); galleryItems[i].type = galleryItems[i].type === "図面" ? "写真" : "図面"; renderGallery(); }
+    else if (view) { openLightbox(galleryItems, Number(view.dataset.galleryView)); }
   });
 
   $("#modalClose").addEventListener("click", () => modal.close());
@@ -232,8 +281,40 @@
   }
 
   const agentName = (id) => (data.agents.find((a) => a.id === id) || {}).name || "—";
+  const agentOf = (id) => data.agents.find((a) => a.id === id) || null;
   const customerName = (id) => (data.customers.find((c) => c.id === id) || {}).name || "（不明）";
   const propertyName = (id) => (data.properties.find((p) => p.id === id) || {}).name || "（未設定）";
+  const firstPhoto = (p) => { const m = (p.media || []).find((x) => x.type === "写真") || (p.media || [])[0]; return m ? m.url : ""; };
+
+  /* ---------- ライトボックス ---------- */
+  const lb = { items: [], idx: 0 };
+  function openLightbox(items, idx) {
+    lb.items = items.filter((m) => m && m.url);
+    lb.idx = idx || 0;
+    if (!lb.items.length) return;
+    updateLightbox();
+    $("#lightbox").hidden = false;
+  }
+  function updateLightbox() {
+    const m = lb.items[lb.idx];
+    if (!m) return;
+    $("#lbImg").src = m.url;
+    $("#lbCaption").textContent = `${m.type || "写真"}（${lb.idx + 1}/${lb.items.length}）`;
+  }
+  function stepLightbox(dir) {
+    lb.idx = (lb.idx + dir + lb.items.length) % lb.items.length;
+    updateLightbox();
+  }
+  $("#lbClose").addEventListener("click", () => ($("#lightbox").hidden = true));
+  $("#lbPrev").addEventListener("click", () => stepLightbox(-1));
+  $("#lbNext").addEventListener("click", () => stepLightbox(1));
+  $("#lightbox").addEventListener("click", (e) => { if (e.target.id === "lightbox") $("#lightbox").hidden = true; });
+  document.addEventListener("keydown", (e) => {
+    if ($("#lightbox").hidden) return;
+    if (e.key === "Escape") $("#lightbox").hidden = true;
+    else if (e.key === "ArrowLeft") stepLightbox(-1);
+    else if (e.key === "ArrowRight") stepLightbox(1);
+  });
 
   /* ---------- CSV 出力 ---------- */
   function downloadCSV(filename, headers, rows) {
@@ -262,7 +343,9 @@
       .map((p) => {
         const st = propStatusMeta(p.status);
         const unit = p.area > 0 ? Math.round(p.price / p.area) : 0;
-        const thumb = p.photo ? `<img class="prop-thumb" src="${esc(p.photo)}" alt="" />` : "";
+        const ph = firstPhoto(p);
+        const count = (p.media || []).length;
+        const thumb = ph ? `<img class="prop-thumb" src="${esc(ph)}" data-act="gallery" data-id="${p.id}" alt="" />` : "";
         return `<tr>
           <td>${esc(p.code)}</td>
           <td><span class="name-cell">${thumb}${esc(p.name)}</span></td>
@@ -275,6 +358,8 @@
           <td>${esc(agentName(p.agentId))}</td>
           <td><span class="badge ${st.value}">${st.label}</span></td>
           <td class="actions-col"><span class="row-actions">
+            <button class="btn tiny" data-act="gallery" data-id="${p.id}">ギャラリー${count ? "(" + count + ")" : ""}</button>
+            <button class="btn tiny" data-act="flyer" data-id="${p.id}">チラシ</button>
             <button class="btn tiny" data-act="edit" data-id="${p.id}">編集</button>
             <button class="btn tiny danger" data-act="del" data-id="${p.id}">削除</button>
           </span></td>
@@ -295,18 +380,26 @@
       { name: "area", label: "面積(㎡)", type: "number", default: 0 },
       { name: "status", label: "ステータス", type: "select", options: PROP_STATUS.map((s) => ({ value: s.value, label: s.label })) },
       { name: "agentId", label: "担当営業", type: "select", options: [{ value: "", label: "（未割当）" }].concat(data.agents.map((a) => ({ value: a.id, label: a.name }))) },
-      { name: "photo", label: "物件写真", type: "photo" },
+      { name: "media", label: "写真・図面ギャラリー（複数可・写真/図面を切替可）", type: "gallery" },
     ];
+  }
+
+  function parseMedia(v) {
+    if (Array.isArray(v)) return v;
+    try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
   }
 
   function openPropertyModal(id) {
     const p = id ? data.properties.find((x) => x.id === id) : {};
+    galleryItems = (p.media || []).map((m) => Object.assign({}, m));
     modal.open(id ? "物件を編集" : "物件を登録", propertyFields(), p, (v) => {
       if (!v.code || !v.name) { toast("物件番号と物件名は必須です"); return false; }
+      v.media = parseMedia(v.media);
       if (id) Object.assign(p, v);
       else data.properties.push(Object.assign({ id: uid() }, v));
       save(); renderAll(); toast(id ? "物件を更新しました" : "物件を登録しました");
     });
+    renderGallery();
   }
 
   $("#btnAddProperty").addEventListener("click", () => openPropertyModal());
@@ -314,14 +407,17 @@
   $("#propStatusFilter").addEventListener("change", renderProperties);
   $("#btnCsvProperties").addEventListener("click", () => {
     downloadCSV("物件一覧-" + todayStr() + ".csv",
-      ["物件番号", "物件名", "種別", "所在地", "販売価格", "間取り", "面積(㎡)", "㎡単価", "担当営業", "ステータス"],
-      data.properties.map((p) => [p.code, p.name, p.type, p.address, p.price, p.layout, p.area, p.area > 0 ? Math.round(p.price / p.area) : "", agentName(p.agentId), propStatusMeta(p.status).label]));
+      ["物件番号", "物件名", "種別", "所在地", "販売価格", "間取り", "面積(㎡)", "㎡単価", "担当営業", "ステータス", "画像枚数"],
+      data.properties.map((p) => [p.code, p.name, p.type, p.address, p.price, p.layout, p.area, p.area > 0 ? Math.round(p.price / p.area) : "", agentName(p.agentId), propStatusMeta(p.status).label, (p.media || []).length]));
   });
   $("#propertyTable").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-act]"); if (!btn) return;
+    const btn = e.target.closest("[data-act]"); if (!btn) return;
     const id = btn.dataset.id, p = data.properties.find((x) => x.id === id); if (!p) return;
-    if (btn.dataset.act === "edit") openPropertyModal(id);
-    else confirmDelete(p.name, () => {
+    const act = btn.dataset.act;
+    if (act === "edit") openPropertyModal(id);
+    else if (act === "gallery") openPropertyGallery(p);
+    else if (act === "flyer") printFlyer(p);
+    else if (act === "del") confirmDelete(p.name, () => {
       data.properties = data.properties.filter((x) => x.id !== id);
       data.deals.forEach((d) => { if (d.propertyId === id) d.propertyId = ""; });
       data.viewings = data.viewings.filter((x) => x.propertyId !== id);
@@ -329,18 +425,101 @@
     });
   });
 
+  function openPropertyGallery(p) {
+    const media = p.media || [];
+    if (!media.length) { toast("この物件には画像が登録されていません"); return; }
+    openLightbox(media, 0);
+  }
+
+  /* ---------- 印刷用チラシ（別ウィンドウ→PDF保存） ---------- */
+  function printFlyer(p) {
+    const w = window.open("", "_blank");
+    if (!w) { toast("ポップアップがブロックされました。ブラウザの設定をご確認ください"); return; }
+    const photos = (p.media || []).filter((m) => m.type === "写真");
+    const plans = (p.media || []).filter((m) => m.type === "図面");
+    const hero = (photos[0] || (p.media || [])[0] || {}).url || "";
+    const subPhotos = photos.slice(1, 4);
+    const ag = agentOf(p.agentId);
+    const unit = p.area > 0 ? Math.round(p.price / p.area) : 0;
+    const spec = (k, v) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`;
+    const doc = `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>${esc(p.name)} 物件チラシ</title>
+    <style>
+      @page { size: A4; margin: 12mm; }
+      * { box-sizing: border-box; }
+      body { font-family: "Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif; color:#1b2b28; margin:0; }
+      .flyer { width: 186mm; }
+      .fl-head { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #0f6e5e; padding-bottom:8px; }
+      .fl-brand { font-weight:800; letter-spacing:2px; color:#0f6e5e; font-size:20px; }
+      .fl-brand small { display:block; font-size:11px; letter-spacing:1px; color:#6a7a76; font-weight:600; }
+      .fl-type { background:#0f6e5e; color:#fff; padding:4px 12px; border-radius:999px; font-size:13px; font-weight:700; }
+      .fl-title { font-size:26px; font-weight:800; margin:14px 0 2px; }
+      .fl-addr { color:#6a7a76; font-size:14px; margin-bottom:12px; }
+      .fl-hero { width:100%; height:78mm; object-fit:cover; border-radius:8px; background:#eef2f1; }
+      .fl-subs { display:flex; gap:6px; margin-top:6px; }
+      .fl-subs img { width:33%; height:34mm; object-fit:cover; border-radius:6px; background:#eef2f1; }
+      .fl-price { font-size:30px; font-weight:800; color:#0f6e5e; margin:14px 0 4px; }
+      .fl-price small { font-size:14px; color:#6a7a76; font-weight:600; }
+      table.fl-spec { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+      table.fl-spec th, table.fl-spec td { border:1px solid #e1e8e6; padding:8px 10px; text-align:left; }
+      table.fl-spec th { background:#f2f7f5; width:28%; color:#6a7a76; }
+      .fl-plan { margin-top:12px; }
+      .fl-plan h3 { font-size:14px; color:#0f6e5e; margin:0 0 6px; }
+      .fl-plan img { max-width:100%; max-height:90mm; object-fit:contain; border:1px solid #e1e8e6; border-radius:6px; }
+      .fl-foot { margin-top:16px; border-top:1px solid #e1e8e6; padding-top:10px; font-size:13px; color:#1b2b28; display:flex; justify-content:space-between; }
+      .fl-note { font-size:11px; color:#9aa8a4; margin-top:6px; }
+      @media print { .noprint { display:none; } }
+    </style></head><body>
+    <div class="flyer">
+      <div class="fl-head">
+        <div class="fl-brand">RE SALES<small>不動産販売</small></div>
+        <div class="fl-type">${esc(p.type)}</div>
+      </div>
+      <div class="fl-title">${esc(p.name)}</div>
+      <div class="fl-addr">${esc(p.address || "")}　（物件番号 ${esc(p.code)}）</div>
+      ${hero ? `<img class="fl-hero" src="${esc(hero)}" alt="">` : `<div class="fl-hero"></div>`}
+      ${subPhotos.length ? `<div class="fl-subs">${subPhotos.map((m) => `<img src="${esc(m.url)}" alt="">`).join("")}</div>` : ""}
+      <div class="fl-price">${man(p.price)} <small>（${unit ? man(unit) + " / ㎡" : "—"}）</small></div>
+      <table class="fl-spec">
+        ${spec("種別", esc(p.type))}
+        ${spec("間取り", esc(p.layout || "—"))}
+        ${spec("専有面積", (Number(p.area || 0).toLocaleString()) + " ㎡")}
+        ${spec("所在地", esc(p.address || "—"))}
+        ${spec("販売状況", propStatusMeta(p.status).label)}
+      </table>
+      ${plans.length ? `<div class="fl-plan"><h3>間取り図</h3><img src="${esc(plans[0].url)}" alt="間取り図"></div>` : ""}
+      <div class="fl-foot">
+        <div><strong>お問い合わせ</strong><br>担当: ${esc(ag ? ag.name : "—")}${ag && ag.store ? "（" + esc(ag.store) + "）" : ""}</div>
+        <div style="text-align:right">RE SALES 不動産販売<br>${esc(todayStr())} 現在</div>
+      </div>
+      <div class="fl-note">※本チラシは社内管理データから自動生成した参考資料です。最新の販売条件は担当までお問い合わせください。</div>
+      <div class="noprint" style="margin-top:16px;text-align:center;">
+        <button onclick="window.print()" style="padding:8px 20px;font-size:14px;cursor:pointer;">印刷 / PDF保存</button>
+      </div>
+    </div>
+    <script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>
+    </body></html>`;
+    w.document.open();
+    w.document.write(doc);
+    w.document.close();
+    toast("チラシを別ウィンドウで開きました（印刷ダイアログでPDF保存できます）");
+  }
+
   /* ================= 顧客・商談 ================= */
   function renderCustomers() {
     const q = ($("#customerSearch").value || "").toLowerCase();
     const list = data.customers.filter((c) => !q || c.name.toLowerCase().includes(q));
     $("#customerTable tbody").innerHTML =
-      list.map((c) => `<tr>
-        <td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.email)}</td>
-        <td class="num">${man(c.budget)}</td><td>${esc(c.wish)}</td>
-        <td class="actions-col"><span class="row-actions">
-          <button class="btn tiny" data-act="edit" data-id="${c.id}">編集</button>
-          <button class="btn tiny danger" data-act="del" data-id="${c.id}">削除</button>
-        </span></td></tr>`).join("") || `<tr><td colspan="6" class="empty">顧客がありません</td></tr>`;
+      list.map((c) => {
+        const cond = [c.prefArea, c.prefType, c.minRooms ? c.minRooms + "LDK以上" : "", c.wish].filter(Boolean).join(" / ");
+        return `<tr>
+          <td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.email)}</td>
+          <td class="num">${man(c.budget)}</td><td>${esc(cond)}</td>
+          <td class="actions-col"><span class="row-actions">
+            <button class="btn tiny" data-act="match" data-id="${c.id}">物件提案</button>
+            <button class="btn tiny" data-act="edit" data-id="${c.id}">編集</button>
+            <button class="btn tiny danger" data-act="del" data-id="${c.id}">削除</button>
+          </span></td></tr>`;
+      }).join("") || `<tr><td colspan="6" class="empty">顧客がありません</td></tr>`;
 
     const deals = data.deals.filter((d) => {
       if (!q) return true;
@@ -362,22 +541,92 @@
       }).join("") || `<tr><td colspan="7" class="empty">商談がありません</td></tr>`;
   }
 
-  const customerFields = [
+  const customerFields = () => [
     { name: "name", label: "顧客名", required: true },
     { name: "phone", label: "電話番号" },
     { name: "email", label: "メールアドレス", type: "email" },
     { name: "budget", label: "ご予算(円)", type: "number", default: 0 },
-    { name: "wish", label: "希望条件", type: "textarea", placeholder: "エリア・間取り・駅距離など" },
+    { name: "prefArea", label: "希望エリア（カンマ区切りで複数可）", placeholder: "例: 港区,目黒,品川" },
+    { name: "prefType", label: "希望種別", type: "select", options: [{ value: "", label: "指定なし" }].concat(PROP_TYPES.map((t) => ({ value: t, label: t }))) },
+    { name: "minRooms", label: "希望最低間取り（居室数）", type: "number", default: 0, placeholder: "例: 3（3LDK以上）" },
+    { name: "wish", label: "その他希望条件（メモ）", type: "textarea", placeholder: "駅距離・築年数など" },
   ];
 
   function openCustomerModal(id) {
     const c = id ? data.customers.find((x) => x.id === id) : {};
-    modal.open(id ? "顧客を編集" : "顧客を追加", customerFields, c, (v) => {
+    modal.open(id ? "顧客を編集" : "顧客を追加", customerFields(), c, (v) => {
       if (!v.name) { toast("顧客名は必須です"); return false; }
       if (id) Object.assign(c, v);
       else data.customers.push(Object.assign({ id: uid() }, v));
       save(); renderAll(); toast(id ? "顧客を更新しました" : "顧客を追加しました");
     });
+  }
+
+  /* ---------- 物件マッチング（希望条件と物件の自動突合） ---------- */
+  function matchProperties(c) {
+    const areas = String(c.prefArea || "").split(/[,、\s]+/).map((s) => s.trim()).filter(Boolean);
+    return data.properties
+      .filter((p) => p.status !== "sold")
+      .map((p) => {
+        let score = 0; const reasons = [];
+        // 予算（最大45点）
+        if (c.budget > 0) {
+          if (p.price <= c.budget) { score += 45; reasons.push({ t: "予算内", warn: false }); }
+          else if (p.price <= c.budget * 1.1) { score += 22; reasons.push({ t: "予算+10%以内", warn: true }); }
+          else { reasons.push({ t: "予算オーバー", warn: true }); }
+        }
+        // エリア（最大25点）
+        const hitArea = areas.find((a) => (p.address || "").includes(a) || (p.name || "").includes(a));
+        if (hitArea) { score += 25; reasons.push({ t: "エリア一致: " + hitArea, warn: false }); }
+        else if (areas.length) { reasons.push({ t: "希望エリア外", warn: true }); }
+        // 種別（最大20点）
+        if (c.prefType) {
+          if (p.type === c.prefType) { score += 20; reasons.push({ t: "種別一致", warn: false }); }
+          else { reasons.push({ t: "種別: " + p.type, warn: true }); }
+        }
+        // 間取り（最大10点）
+        if (c.minRooms > 0 && layoutRooms(p.layout) > 0) {
+          if (layoutRooms(p.layout) >= c.minRooms) { score += 10; reasons.push({ t: "間取り条件を満たす", warn: false }); }
+          else { reasons.push({ t: "間取り不足", warn: true }); }
+        }
+        // 満点（設定された条件のみ加点対象）
+        let maxScore = 0;
+        if (c.budget > 0) maxScore += 45;
+        if (areas.length) maxScore += 25;
+        if (c.prefType) maxScore += 20;
+        if (c.minRooms > 0) maxScore += 10;
+        const pct = maxScore ? Math.round((score / maxScore) * 100) : 0;
+        return { p, score, pct, reasons };
+      })
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score);
+  }
+
+  function openMatchModal(id) {
+    const c = data.customers.find((x) => x.id === id); if (!c) return;
+    const results = matchProperties(c);
+    const condLine = [
+      c.budget ? "予算 " + man(c.budget) : "",
+      c.prefArea ? "エリア " + c.prefArea : "",
+      c.prefType || "",
+      c.minRooms ? c.minRooms + "LDK以上" : "",
+    ].filter(Boolean).join(" ／ ") || "希望条件が未設定です";
+    const body = results.length
+      ? `<div class="match-list">` + results.map((r) => {
+          const ph = firstPhoto(r.p);
+          const thumb = ph ? `<img class="prop-thumb" src="${esc(ph)}" alt="" />` : "";
+          return `<div class="match-item">
+            <div class="match-head">
+              <span class="match-name">${thumb}${esc(r.p.name)}</span>
+              <span class="match-price">${man(r.p.price)}</span>
+            </div>
+            <div class="match-meta">${esc(r.p.type)} / ${esc(r.p.layout || "—")} / ${Number(r.p.area || 0).toLocaleString()}㎡ / ${esc(r.p.address || "")}　<b>適合度 ${r.pct}%</b></div>
+            <div class="match-score-bar"><div class="match-score-fill" style="width:${r.pct}%"></div></div>
+            <div class="match-reasons">${r.reasons.map((x) => `<span class="match-reason ${x.warn ? "warn" : ""}">${esc(x.t)}</span>`).join("")}</div>
+          </div>`;
+        }).join("") + `</div>`
+      : `<div class="empty">条件に合致する物件が見つかりませんでした（成約済は除外されます）。</div>`;
+    modal.openInfo(`物件提案 — ${esc(c.name)} 様`, `<div class="match-meta" style="margin-bottom:10px;">希望条件: ${esc(condLine)}</div>${body}`);
   }
 
   function dealFields() {
@@ -399,12 +648,10 @@
     const d = id ? data.deals.find((x) => x.id === id) : {};
     modal.open(id ? "商談を編集" : "商談を追加", dealFields(), d, (v) => {
       if (!v.title) { toast("商談名は必須です"); return false; }
-      // 対象物件から担当を自動補完（未指定時）
       if (!v.agentId && v.propertyId) {
         const prop = data.properties.find((p) => p.id === v.propertyId);
         if (prop && prop.agentId) v.agentId = prop.agentId;
       }
-      // 成約なのに成約日が空なら本日を補完
       if (v.stage === "closed" && !v.closeDate) v.closeDate = todayStr();
       if (id) Object.assign(d, v);
       else data.deals.push(Object.assign({ id: uid() }, v));
@@ -417,8 +664,8 @@
   $("#customerSearch").addEventListener("input", renderCustomers);
   $("#btnCsvCustomers").addEventListener("click", () => {
     downloadCSV("顧客一覧-" + todayStr() + ".csv",
-      ["顧客名", "電話番号", "メール", "予算", "希望条件"],
-      data.customers.map((c) => [c.name, c.phone, c.email, c.budget, c.wish]));
+      ["顧客名", "電話番号", "メール", "予算", "希望エリア", "希望種別", "最低間取り", "メモ"],
+      data.customers.map((c) => [c.name, c.phone, c.email, c.budget, c.prefArea, c.prefType, c.minRooms, c.wish]));
   });
   $("#btnCsvDeals").addEventListener("click", () => {
     downloadCSV("商談一覧-" + todayStr() + ".csv",
@@ -428,8 +675,10 @@
   $("#customerTable").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-act]"); if (!btn) return;
     const id = btn.dataset.id, c = data.customers.find((x) => x.id === id); if (!c) return;
-    if (btn.dataset.act === "edit") openCustomerModal(id);
-    else confirmDelete(c.name, () => {
+    const act = btn.dataset.act;
+    if (act === "edit") openCustomerModal(id);
+    else if (act === "match") openMatchModal(id);
+    else if (act === "del") confirmDelete(c.name, () => {
       data.customers = data.customers.filter((x) => x.id !== id);
       data.deals = data.deals.filter((x) => x.customerId !== id);
       data.viewings = data.viewings.filter((x) => x.customerId !== id);
@@ -549,17 +798,13 @@
   });
 
   /* ================= レポート ================= */
-  function closedDeals() {
-    return data.deals.filter((d) => d.stage === "closed");
-  }
-  // 成約の担当者: 明示指定 > 対象物件の担当
+  function closedDeals() { return data.deals.filter((d) => d.stage === "closed"); }
   function dealAgentId(d) {
     if (d.agentId) return d.agentId;
     const prop = data.properties.find((p) => p.id === d.propertyId);
     return prop ? prop.agentId : "";
   }
 
-  // 直近nヶ月の成約金額を集計
   function monthlySeries(months) {
     const now = new Date();
     const keys = [];
@@ -576,12 +821,10 @@
     return keys.map((k) => ({ label: k.slice(5) + "月", full: k, amount: map[k].amount, count: map[k].count }));
   }
 
-  // 縦棒グラフ（単一系列・値ラベル直付け）
   function renderBarChart(el, series, opts) {
     opts = opts || {};
     if (!series.length || series.every((s) => s.amount === 0)) {
-      el.innerHTML = `<div class="chart-empty">成約データがありません</div>`;
-      return;
+      el.innerHTML = `<div class="chart-empty">成約データがありません</div>`; return;
     }
     const W = Math.max(series.length * 84, 560), H = 240;
     const padL = 8, padR = 8, padB = 40, padT = 26;
@@ -601,16 +844,12 @@
         <text class="x-label" x="${x + barW / 2}" y="${H - padB + 16}" text-anchor="middle">${esc(s.label)}</text>`;
     }).join("");
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="月次成約金額の棒グラフ">
-      <line class="axis-line" x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}"></line>
-      ${bars}
-    </svg>`;
+      <line class="axis-line" x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}"></line>${bars}</svg>`;
   }
 
-  // 横棒グラフ（担当者別・単一系列）
   function renderHBarChart(el, rows) {
     if (!rows.length || rows.every((r) => r.amount === 0)) {
-      el.innerHTML = `<div class="chart-empty">成約データがありません</div>`;
-      return;
+      el.innerHTML = `<div class="chart-empty">成約データがありません</div>`; return;
     }
     const rowH = 34, padL = 90, padR = 70, padT = 8, padB = 8;
     const W = 520, H = padT + padB + rows.length * rowH;
@@ -690,13 +929,12 @@
       { label: "成約済物件", value: soldCount + " 件", sub: "全 " + data.properties.length + " 物件中", gold: true },
       { label: "今後の内見", value: upcoming.length + " 件", sub: "本日以降の予定" },
     ].map((k) => `<div class="kpi ${k.gold ? "gold" : ""}">
-        <div class="k-label">${k.label}</div>
-        <div class="k-value">${k.value}</div>
-        <div class="k-sub">${k.sub}</div></div>`).join("");
+        <div class="k-label">${k.label}</div><div class="k-value">${k.value}</div><div class="k-sub">${k.sub}</div></div>`).join("");
 
     $("#activeProps").innerHTML = activeProps.length
       ? activeProps.slice(0, 6).map((p) => { const st = propStatusMeta(p.status);
-          const thumb = p.photo ? `<img class="prop-thumb" src="${esc(p.photo)}" alt="" />` : "";
+          const ph = firstPhoto(p);
+          const thumb = ph ? `<img class="prop-thumb" src="${esc(ph)}" alt="" />` : "";
           return `<div class="mini-item"><span class="mi-main"><span class="name-cell">${thumb}${esc(p.name)}</span><br><span class="mi-sub">${esc(p.type)} / ${esc(p.layout)} / ${esc(p.address)}</span></span>
           <span class="mi-sub">${man(p.price)} <span class="badge ${st.value}">${st.label}</span></span></div>`; }).join("")
       : `<div class="empty">販売中の物件はありません</div>`;
@@ -735,6 +973,7 @@
         if (!d || typeof d !== "object") throw new Error("bad");
         data = Object.assign(defaultData(), d);
         ["agents", "properties", "customers", "deals", "viewings"].forEach((k) => { if (!Array.isArray(data[k])) data[k] = []; });
+        migrate(data);
         save(); renderAll(); toast("データを読み込みました");
       } catch (err) { toast("読み込みに失敗しました（JSON形式を確認）"); }
       e.target.value = "";

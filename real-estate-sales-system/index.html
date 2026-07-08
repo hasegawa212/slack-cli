@@ -205,6 +205,17 @@
     </div>
   </div>
 
+  <!-- ライトボックス（ギャラリー閲覧） -->
+  <div class="lightbox" id="lightbox" hidden>
+    <button class="lb-close" id="lbClose" aria-label="閉じる">×</button>
+    <button class="lb-nav lb-prev" id="lbPrev" aria-label="前へ">‹</button>
+    <figure class="lb-figure">
+      <img id="lbImg" alt="物件画像" />
+      <figcaption id="lbCaption"></figcaption>
+    </figure>
+    <button class="lb-nav lb-next" id="lbNext" aria-label="次へ">›</button>
+  </div>
+
   <div class="toast" id="toast" hidden></div>
 
   <script src="app.js"></script>
