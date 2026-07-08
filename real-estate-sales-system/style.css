@@ -132,6 +132,30 @@ main { padding: 24px; max-width: 1320px; margin: 0 auto; }
 
 .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
 
+/* Photo thumbnails */
+.prop-thumb {
+  width: 40px; height: 30px; object-fit: cover; border-radius: 5px;
+  border: 1px solid var(--border); vertical-align: middle; margin-right: 8px; background: #eef2f1;
+}
+.name-cell { display: inline-flex; align-items: center; }
+.photo-preview {
+  max-width: 160px; max-height: 120px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--border); margin-top: 4px;
+}
+.photo-clear { width: fit-content; margin-top: 6px; }
+
+/* Charts */
+.chart { width: 100%; overflow-x: auto; }
+.chart svg { display: block; max-width: 100%; height: auto; }
+.chart .bar { fill: var(--re-accent); }
+.chart .bar-h { fill: var(--re-accent); }
+.chart .bar-track { fill: #eef2f1; }
+.chart .axis-line { stroke: var(--border); stroke-width: 1; }
+.chart .val-label { fill: var(--text); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .x-label { fill: var(--muted); font-size: 11px; }
+.chart .cnt-label { fill: var(--muted); font-size: 10px; }
+.chart .chart-empty { color: var(--muted); font-size: 13px; padding: 24px; text-align: center; }
+
 /* Modal */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(10, 34, 28, .5);
