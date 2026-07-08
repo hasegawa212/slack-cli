@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>不動産販売管理システム</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">RE SALES</span>
+      <span class="brand-sub">不動産販売管理</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="dashboard">ダッシュボード</button>
+      <button class="tab" data-view="properties">物件管理</button>
+      <button class="tab" data-view="customers">顧客・商談</button>
+      <button class="tab" data-view="agents">営業・内見</button>
+    </nav>
+    <div class="header-actions">
+      <button class="btn ghost" id="btnExport" title="全データをJSONで書き出し">エクスポート</button>
+      <button class="btn ghost" id="btnImport" title="JSONを読み込み">インポート</button>
+      <input type="file" id="importFile" accept="application/json" hidden />
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ダッシュボード -->
+    <section class="view active" id="view-dashboard">
+      <h1 class="view-title">ダッシュボード</h1>
+      <div class="cards" id="kpiCards"></div>
+      <div class="panel-grid">
+        <div class="panel">
+          <h2 class="panel-title">販売中の物件</h2>
+          <div id="activeProps" class="mini-list"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">進行中の商談</h2>
+          <div id="openDealsList" class="mini-list"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">今後の内見予定</h2>
+          <div id="upcomingViewings" class="mini-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 物件管理 -->
+    <section class="view" id="view-properties">
+      <div class="view-head">
+        <h1 class="view-title">物件管理</h1>
+        <div class="view-head-actions">
+          <select class="search" id="propStatusFilter">
+            <option value="">全ステータス</option>
+            <option value="prep">公開前</option>
+            <option value="active">販売中</option>
+            <option value="negotiating">商談中</option>
+            <option value="sold">成約済</option>
+          </select>
+          <input class="search" id="propertySearch" placeholder="物件名・住所・物件番号で検索…" />
+          <button class="btn primary" id="btnAddProperty">＋ 物件を登録</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="propertyTable">
+          <thead>
+            <tr>
+              <th>物件番号</th><th>物件名</th><th>種別</th><th>住所</th>
+              <th class="num">価格</th><th>間取り</th><th class="num">面積(㎡)</th>
+              <th class="num">㎡単価</th><th>担当</th><th>ステータス</th><th class="actions-col">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 顧客・商談 -->
+    <section class="view" id="view-customers">
+      <div class="view-head">
+        <h1 class="view-title">顧客・商談管理</h1>
+        <div class="view-head-actions">
+          <input class="search" id="customerSearch" placeholder="顧客名・物件名で検索…" />
+          <button class="btn primary" id="btnAddCustomer">＋ 顧客を追加</button>
+          <button class="btn" id="btnAddDeal">＋ 商談を追加</button>
+        </div>
+      </div>
+      <div class="panel-grid two">
+        <div class="panel">
+          <h2 class="panel-title">顧客一覧</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="customerTable">
+              <thead>
+                <tr><th>顧客名</th><th>電話</th><th>メール</th><th class="num">予算</th><th>希望条件</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">商談一覧</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="dealTable">
+              <thead>
+                <tr><th>商談名</th><th>顧客</th><th>物件</th><th class="num">想定価格</th><th>ステージ</th><th>次アクション日</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 営業・内見 -->
+    <section class="view" id="view-agents">
+      <div class="view-head">
+        <h1 class="view-title">営業担当・内見管理</h1>
+        <div class="view-head-actions">
+          <input class="search" id="agentSearch" placeholder="氏名・店舗で検索…" />
+          <button class="btn primary" id="btnAddAgent">＋ 営業担当を追加</button>
+          <button class="btn" id="btnAddViewing">＋ 内見予約を追加</button>
+        </div>
+      </div>
+      <div class="panel-grid two">
+        <div class="panel">
+          <h2 class="panel-title">営業担当一覧</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="agentTable">
+              <thead>
+                <tr><th>社員番号</th><th>氏名</th><th>店舗</th><th>役職</th><th class="num">担当物件</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">内見スケジュール</h2>
+          <div class="filter-row">
+            <input type="date" id="viewingDate" class="search" />
+            <button class="btn ghost" id="btnClearViewingFilter">全期間</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="viewingTable">
+              <thead>
+                <tr><th>日付</th><th>時刻</th><th>物件</th><th>顧客</th><th>担当</th><th>状態</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- モーダル -->
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h3 id="modalTitle">タイトル</h3>
+        <button class="modal-close" id="modalClose" aria-label="閉じる">×</button>
+      </div>
+      <form id="modalForm" class="modal-form"></form>
+      <div class="modal-foot">
+        <button type="button" class="btn ghost" id="modalCancel">キャンセル</button>
+        <button type="submit" class="btn primary" id="modalSave" form="modalForm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
