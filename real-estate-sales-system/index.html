@@ -17,6 +17,7 @@
       <button class="tab" data-view="properties">物件管理</button>
       <button class="tab" data-view="customers">顧客・商談</button>
       <button class="tab" data-view="agents">営業・内見</button>
+      <button class="tab" data-view="reports">レポート</button>
     </nav>
     <div class="header-actions">
       <button class="btn ghost" id="btnExport" title="全データをJSONで書き出し">エクスポート</button>
@@ -59,6 +60,7 @@
             <option value="sold">成約済</option>
           </select>
           <input class="search" id="propertySearch" placeholder="物件名・住所・物件番号で検索…" />
+          <button class="btn" id="btnCsvProperties" title="物件一覧をCSVで出力">CSV出力</button>
           <button class="btn primary" id="btnAddProperty">＋ 物件を登録</button>
         </div>
       </div>
@@ -82,6 +84,8 @@
         <h1 class="view-title">顧客・商談管理</h1>
         <div class="view-head-actions">
           <input class="search" id="customerSearch" placeholder="顧客名・物件名で検索…" />
+          <button class="btn" id="btnCsvCustomers" title="顧客一覧をCSVで出力">顧客CSV</button>
+          <button class="btn" id="btnCsvDeals" title="商談一覧をCSVで出力">商談CSV</button>
           <button class="btn primary" id="btnAddCustomer">＋ 顧客を追加</button>
           <button class="btn" id="btnAddDeal">＋ 商談を追加</button>
         </div>
@@ -144,6 +148,39 @@
             <table class="data-table" id="viewingTable">
               <thead>
                 <tr><th>日付</th><th>時刻</th><th>物件</th><th>顧客</th><th>担当</th><th>状態</th><th class="actions-col">操作</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- レポート -->
+    <section class="view" id="view-reports">
+      <div class="view-head">
+        <h1 class="view-title">販売レポート</h1>
+        <div class="view-head-actions">
+          <button class="btn" id="btnCsvSales" title="担当者別売上をCSVで出力">売上CSV</button>
+        </div>
+      </div>
+      <div class="cards" id="reportKpis"></div>
+      <div class="panel-grid">
+        <div class="panel" style="grid-column: 1 / -1;">
+          <h2 class="panel-title">月次成約実績（成約金額）</h2>
+          <div id="monthlyChart" class="chart"></div>
+        </div>
+      </div>
+      <div class="panel-grid two" style="margin-top:16px;">
+        <div class="panel">
+          <h2 class="panel-title">担当者別 成約金額</h2>
+          <div id="agentChart" class="chart"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">担当者別 売上集計</h2>
+          <div class="table-wrap">
+            <table class="data-table" id="agentSalesTable">
+              <thead>
+                <tr><th>担当者</th><th>店舗</th><th class="num">担当物件</th><th class="num">成約件数</th><th class="num">成約金額</th></tr>
               </thead>
               <tbody></tbody>
             </table>
