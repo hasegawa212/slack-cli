@@ -16,10 +16,16 @@
       <button class="tab active" data-view="dashboard">ダッシュボード</button>
       <button class="tab" data-view="properties">物件管理</button>
       <button class="tab" data-view="customers">顧客・商談</button>
+      <button class="tab" data-view="board">商談ボード</button>
       <button class="tab" data-view="agents">営業・内見</button>
       <button class="tab" data-view="reports">レポート</button>
     </nav>
     <div class="header-actions">
+      <div class="global-search-wrap">
+        <input type="search" id="globalSearch" class="global-search" placeholder="全体検索…" aria-label="全体検索" />
+        <div class="global-results" id="globalResults" hidden></div>
+      </div>
+      <button class="btn ghost icon-btn" id="btnTheme" title="ダークモード切替" aria-label="ダークモード切替">🌙</button>
       <button class="btn ghost" id="btnExport" title="全データをJSONで書き出し">エクスポート</button>
       <button class="btn ghost" id="btnImport" title="JSONを読み込み">インポート</button>
       <input type="file" id="importFile" accept="application/json" hidden />
@@ -114,6 +120,18 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- 商談ボード（カンバン） -->
+    <section class="view" id="view-board">
+      <div class="view-head">
+        <h1 class="view-title">商談ボード</h1>
+        <div class="view-head-actions">
+          <span class="hint">カードをドラッグしてステージを移動できます（スマホはカードをタップして編集）</span>
+          <button class="btn primary" id="btnAddDeal2">＋ 商談を追加</button>
+        </div>
+      </div>
+      <div class="kanban" id="kanbanBoard"></div>
     </section>
 
     <!-- 営業・内見 -->

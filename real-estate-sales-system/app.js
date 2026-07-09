@@ -116,22 +116,52 @@
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
-  function toast(msg) {
+  function toast(msg, undoFn) {
     const t = $("#toast");
-    t.textContent = msg;
+    t.innerHTML = "";
+    t.appendChild(document.createTextNode(msg));
+    if (undoFn) {
+      const btn = document.createElement("button");
+      btn.className = "toast-undo";
+      btn.textContent = "取り消す";
+      btn.addEventListener("click", () => { t.hidden = true; undoFn(); });
+      t.appendChild(btn);
+    }
     t.hidden = false;
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => (t.hidden = true), 2600);
+    toast._t = setTimeout(() => (t.hidden = true), undoFn ? 6000 : 2600);
   }
 
+  const TAB_KEY = "re_tab";
+  function activateTab(view) {
+    const tab = $(`#tabs .tab[data-view="${view}"]`) || $("#tabs .tab");
+    $$("#tabs .tab").forEach((t) => t.classList.remove("active"));
+    $$(".view").forEach((v) => v.classList.remove("active"));
+    tab.classList.add("active");
+    $("#view-" + tab.dataset.view).classList.add("active");
+    try { localStorage.setItem(TAB_KEY, tab.dataset.view); } catch (e) {}
+    renderAll();
+  }
   $$("#tabs .tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      $$("#tabs .tab").forEach((t) => t.classList.remove("active"));
-      $$(".view").forEach((v) => v.classList.remove("active"));
-      tab.classList.add("active");
-      $("#view-" + tab.dataset.view).classList.add("active");
-      renderAll();
-    });
+    tab.addEventListener("click", () => activateTab(tab.dataset.view));
+  });
+
+  /* ---------- テーマ（ダークモード） ---------- */
+  const THEME_KEY = "re_theme";
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    const btn = $("#btnTheme");
+    if (btn) { btn.textContent = theme === "dark" ? "☀️" : "🌙"; btn.title = theme === "dark" ? "ライトモードに切替" : "ダークモードに切替"; }
+  }
+  (function initTheme() {
+    let saved = "light";
+    try { saved = localStorage.getItem(THEME_KEY) || "light"; } catch (e) {}
+    applyTheme(saved);
+  })();
+  $("#btnTheme").addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+    applyTheme(next);
   });
 
   /* ---------- モーダル ---------- */
@@ -276,8 +306,13 @@
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.backdrop.hidden) modal.close(); });
 
+  // 削除は確認ダイアログの代わりに、取り消し可能なトーストで実行（操作性向上）
   function confirmDelete(label, fn) {
-    if (window.confirm(`「${label}」を削除します。よろしいですか？`)) fn();
+    const snapshot = JSON.parse(JSON.stringify(data));
+    fn(); // 呼び出し側で mutations + save + renderAll を実施
+    toast(`「${label}」を削除しました`, () => {
+      data = snapshot; save(); renderAll(); toast("削除を取り消しました");
+    });
   }
 
   const agentName = (id) => (data.agents.find((a) => a.id === id) || {}).name || "—";
@@ -356,7 +391,10 @@
           <td class="num">${Number(p.area || 0).toLocaleString()}</td>
           <td class="num">${unit ? man(unit) : "—"}</td>
           <td>${esc(agentName(p.agentId))}</td>
-          <td><span class="badge ${st.value}">${st.label}</span></td>
+          <td data-sortvalue="${PROP_STATUS.findIndex((s) => s.value === p.status)}">
+            <select class="inline-select" data-inline-status data-id="${p.id}" title="ステータスを変更">
+              ${PROP_STATUS.map((s) => `<option value="${s.value}" ${s.value === p.status ? "selected" : ""}>${s.label}</option>`).join("")}
+            </select></td>
           <td class="actions-col"><span class="row-actions">
             <button class="btn tiny" data-act="gallery" data-id="${p.id}">ギャラリー${count ? "(" + count + ")" : ""}</button>
             <button class="btn tiny" data-act="flyer" data-id="${p.id}">チラシ</button>
@@ -423,6 +461,13 @@
       data.viewings = data.viewings.filter((x) => x.propertyId !== id);
       save(); renderAll(); toast("削除しました");
     });
+  });
+
+  // 一覧からステータスをインライン変更
+  $("#propertyTable").addEventListener("change", (e) => {
+    const sel = e.target.closest("[data-inline-status]"); if (!sel) return;
+    const p = data.properties.find((x) => x.id === sel.dataset.id); if (!p) return;
+    p.status = sel.value; save(); renderAll(); toast(`${p.name} を「${propStatusMeta(p.status).label}」に変更`);
   });
 
   function openPropertyGallery(p) {
@@ -532,7 +577,10 @@
           <td>${esc(d.title)}</td><td>${esc(customerName(d.customerId))}</td>
           <td>${esc(propertyName(d.propertyId))}</td>
           <td class="num">${man(d.amount)}</td>
-          <td><span class="badge ${m.cls}">${m.label}</span></td>
+          <td data-sortvalue="${DEAL_STAGE.findIndex((s) => s.value === d.stage)}">
+            <select class="inline-select" data-inline-stage data-id="${d.id}" title="ステージを変更">
+              ${DEAL_STAGE.map((s) => `<option value="${s.value}" ${s.value === d.stage ? "selected" : ""}>${s.label}</option>`).join("")}
+            </select></td>
           <td>${esc(d.nextDate || "—")}</td>
           <td class="actions-col"><span class="row-actions">
             <button class="btn tiny" data-act="edit" data-id="${d.id}">編集</button>
@@ -691,6 +739,19 @@
     if (btn.dataset.act === "edit") openDealModal(id);
     else confirmDelete(d.title, () => { data.deals = data.deals.filter((x) => x.id !== id); save(); renderAll(); toast("削除しました"); });
   });
+  // 一覧からステージをインライン変更
+  $("#dealTable").addEventListener("change", (e) => {
+    const sel = e.target.closest("[data-inline-stage]"); if (!sel) return;
+    setDealStage(sel.dataset.id, sel.value);
+  });
+
+  // 商談ステージを変更（成約時は成約日を自動補完）
+  function setDealStage(id, stage) {
+    const d = data.deals.find((x) => x.id === id); if (!d) return;
+    d.stage = stage;
+    if (stage === "closed" && !d.closeDate) d.closeDate = todayStr();
+    save(); renderAll(); toast(`「${d.title}」を「${dealStageMeta(stage).label}」に変更`);
+  }
 
   /* ================= 営業・内見 ================= */
   function renderAgents() {
@@ -981,15 +1042,154 @@
     reader.readAsText(file);
   });
 
+  /* ================= 商談ボード（カンバン） ================= */
+  $("#btnAddDeal2").addEventListener("click", () => openDealModal());
+
+  function renderKanban() {
+    const board = $("#kanbanBoard");
+    board.innerHTML = DEAL_STAGE.map((s) => {
+      const list = data.deals.filter((d) => d.stage === s.value);
+      const sum = list.reduce((a, d) => a + Number(d.amount || 0), 0);
+      const cards = list.map((d) => `
+        <div class="kb-card" draggable="true" data-id="${d.id}">
+          <div class="kc-title">${esc(d.title)}</div>
+          <div class="kc-sub">${esc(customerName(d.customerId))} / ${esc(propertyName(d.propertyId))}</div>
+          <div class="kc-amount">${man(d.amount)}</div>
+        </div>`).join("") || `<div class="kb-empty">なし</div>`;
+      return `<div class="kb-col" data-stage="${s.value}">
+        <div class="kb-col-head"><span><span class="badge ${s.cls}">${s.label}</span> <span class="kb-count">${list.length}</span></span><span class="kb-sum">${sum ? man(sum) : ""}</span></div>
+        <div class="kb-list">${cards}</div>
+      </div>`;
+    }).join("");
+  }
+
+  let dragDealId = null;
+  $("#kanbanBoard").addEventListener("dragstart", (e) => {
+    const card = e.target.closest(".kb-card"); if (!card) return;
+    dragDealId = card.dataset.id;
+    card.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragDealId);
+  });
+  $("#kanbanBoard").addEventListener("dragend", (e) => {
+    const card = e.target.closest(".kb-card"); if (card) card.classList.remove("dragging");
+    $$(".kb-col").forEach((c) => c.classList.remove("drop-hover"));
+  });
+  $("#kanbanBoard").addEventListener("dragover", (e) => {
+    const col = e.target.closest(".kb-col"); if (!col) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "move";
+    $$(".kb-col").forEach((c) => c.classList.toggle("drop-hover", c === col));
+  });
+  $("#kanbanBoard").addEventListener("drop", (e) => {
+    const col = e.target.closest(".kb-col"); if (!col) return;
+    e.preventDefault();
+    const id = dragDealId || e.dataTransfer.getData("text/plain");
+    const d = data.deals.find((x) => x.id === id);
+    if (d && d.stage !== col.dataset.stage) setDealStage(id, col.dataset.stage);
+    dragDealId = null;
+    $$(".kb-col").forEach((c) => c.classList.remove("drop-hover"));
+  });
+  // スマホ等: カードをタップで編集モーダル（クリックはドラッグ後には発火しない）
+  $("#kanbanBoard").addEventListener("click", (e) => {
+    const card = e.target.closest(".kb-card"); if (!card) return;
+    openDealModal(card.dataset.id);
+  });
+
+  /* ================= グローバル検索 ================= */
+  const gInput = $("#globalSearch"), gResults = $("#globalResults");
+  function runGlobalSearch() {
+    const q = (gInput.value || "").trim().toLowerCase();
+    if (!q) { gResults.hidden = true; gResults.innerHTML = ""; return; }
+    const hit = (s) => String(s || "").toLowerCase().includes(q);
+    const groups = [];
+    const props = data.properties.filter((p) => hit(p.name) || hit(p.code) || hit(p.address));
+    if (props.length) groups.push({ label: "物件", view: "properties", input: "#propertySearch", items: props.map((p) => ({ main: p.name, sub: `${p.code} / ${p.type} / ${man(p.price)}`, term: p.name })) });
+    const custs = data.customers.filter((c) => hit(c.name) || hit(c.phone) || hit(c.email));
+    if (custs.length) groups.push({ label: "顧客", view: "customers", input: "#customerSearch", items: custs.map((c) => ({ main: c.name, sub: `${c.phone || ""} ${c.email || ""}`, term: c.name })) });
+    const dls = data.deals.filter((d) => hit(d.title) || hit(customerName(d.customerId)));
+    if (dls.length) groups.push({ label: "商談", view: "customers", input: "#customerSearch", items: dls.map((d) => ({ main: d.title, sub: `${customerName(d.customerId)} / ${dealStageMeta(d.stage).label}`, term: d.title })) });
+    const ags = data.agents.filter((a) => hit(a.name) || hit(a.store) || hit(a.code));
+    if (ags.length) groups.push({ label: "営業担当", view: "agents", input: "#agentSearch", items: ags.map((a) => ({ main: a.name, sub: `${a.code} / ${a.store || ""}`, term: a.name })) });
+
+    gResults.innerHTML = groups.length
+      ? groups.map((g) => `<div class="gr-group">${g.label}（${g.items.length}）</div>` +
+          g.items.slice(0, 6).map((it) => `<div class="gr-item" data-view="${g.view}" data-input="${g.input}" data-term="${esc(it.term)}">
+            <div>${esc(it.main)}</div><div class="gr-sub">${esc(it.sub)}</div></div>`).join("")).join("")
+      : `<div class="gr-empty">「${esc(q)}」に一致する項目はありません</div>`;
+    gResults.hidden = false;
+  }
+  gInput.addEventListener("input", runGlobalSearch);
+  gInput.addEventListener("focus", () => { if (gInput.value.trim()) runGlobalSearch(); });
+  gResults.addEventListener("click", (e) => {
+    const item = e.target.closest(".gr-item"); if (!item) return;
+    activateTab(item.dataset.view);
+    const inp = $(item.dataset.input);
+    if (inp) { inp.value = item.dataset.term; inp.dispatchEvent(new Event("input")); }
+    gResults.hidden = true; gInput.value = "";
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".global-search-wrap")) gResults.hidden = true;
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") gResults.hidden = true; });
+
+  /* ================= 表の並び替え（汎用・DOMベース） ================= */
+  const sortState = {}; // tableId -> { col, dir }
+  const numOf = (raw) => {
+    const m = String(raw).replace(/[^0-9.\-]/g, "");
+    return m === "" || m === "-" || m === "." ? NaN : parseFloat(m);
+  };
+  function sortTableDom(table) {
+    const st = sortState[table.id]; if (!st) return;
+    const tbody = table.tBodies[0]; if (!tbody) return;
+    const rows = Array.from(tbody.rows).filter((r) => !r.querySelector("td.empty"));
+    if (rows.length < 2) return;
+    const val = (r) => { const td = r.cells[st.col]; if (!td) return ""; return td.dataset.sortvalue != null ? td.dataset.sortvalue : td.textContent.trim(); };
+    rows.sort((a, b) => {
+      const va = val(a), vb = val(b), na = numOf(va), nb = numOf(vb);
+      let c;
+      if (!isNaN(na) && !isNaN(nb)) c = na - nb;
+      else c = String(va).localeCompare(String(vb), "ja");
+      return st.dir === "desc" ? -c : c;
+    });
+    rows.forEach((r) => tbody.appendChild(r));
+  }
+  function makeSortable() {
+    $$("table.data-table").forEach((table) => {
+      Array.from(table.tHead.rows[0].cells).forEach((th, idx) => {
+        if (th.classList.contains("actions-col") || th.classList.contains("no-sort")) return;
+        th.classList.add("sortable");
+        if (!th.querySelector(".sort-ind")) { const s = document.createElement("span"); s.className = "sort-ind"; th.appendChild(s); }
+        th.addEventListener("click", () => {
+          const cur = sortState[table.id];
+          const dir = cur && cur.col === idx && cur.dir === "asc" ? "desc" : "asc";
+          sortState[table.id] = { col: idx, dir };
+          Array.from(table.tHead.rows[0].cells).forEach((h) => h.classList.remove("sorted-asc", "sorted-desc"));
+          th.classList.add(dir === "asc" ? "sorted-asc" : "sorted-desc");
+          sortTableDom(table);
+        });
+      });
+    });
+  }
+  function reapplySorts() {
+    Object.keys(sortState).forEach((tid) => { const t = document.getElementById(tid); if (t) sortTableDom(t); });
+  }
+
   /* ================= 描画エントリ ================= */
   function renderAll() {
     renderDashboard();
     renderProperties();
     renderCustomers();
+    renderKanban();
     renderAgents();
     renderReports();
+    reapplySorts();
   }
 
   $("#viewingDate").value = "";
-  renderAll();
+  makeSortable();
+  // 前回開いていたタブを復元
+  let lastTab = "dashboard";
+  try { lastTab = localStorage.getItem(TAB_KEY) || "dashboard"; } catch (e) {}
+  if ($(`#tabs .tab[data-view="${lastTab}"]`)) activateTab(lastTab);
+  else renderAll();
 })();
