@@ -225,6 +225,27 @@ main { padding: 24px; max-width: 1320px; margin: 0 auto; }
 .match-reason.warn { background: #fdf0da; color: var(--amber); }
 .match-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
+/* Target meter */
+.meter-wrap { padding: 4px 0; }
+.meter-figures { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.meter-pct { font-size: 34px; font-weight: 800; letter-spacing: .5px; }
+.meter-pct.over { color: var(--green); }
+.meter-pct.under { color: var(--re-accent); }
+.meter-target { font-size: 12px; color: var(--muted); text-align: right; }
+.meter-target b { color: var(--text); font-size: 13px; }
+.meter-bar { height: 18px; border-radius: 999px; background: var(--inset); border: 1px solid var(--border); overflow: hidden; position: relative; }
+.meter-fill { height: 100%; background: linear-gradient(90deg, var(--re-accent), var(--re-teal)); border-radius: 999px; transition: width .4s ease; }
+.meter-fill.over { background: linear-gradient(90deg, var(--green), #16794a); }
+.meter-sub { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* Lead time */
+.leadtime-wrap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.lt-stat { text-align: center; padding: 12px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--inset); }
+.lt-stat .lt-value { font-size: 24px; font-weight: 800; }
+.lt-stat .lt-value small { font-size: 13px; font-weight: 700; color: var(--muted); }
+.lt-stat .lt-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.leadtime-note { grid-column: 1 / -1; font-size: 12px; color: var(--muted); text-align: center; }
+
 /* Charts */
 .chart { width: 100%; overflow-x: auto; }
 .chart svg { display: block; max-width: 100%; height: auto; }

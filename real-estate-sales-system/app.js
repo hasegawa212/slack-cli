@@ -63,14 +63,15 @@
         { id: c3, name: "高橋 健", phone: "070-1111-2222", email: "takahashi@example.com", budget: 65000000, prefArea: "目黒", prefType: "マンション", minRooms: 2, wish: "築浅" },
       ],
       deals: [
-        { id: uid(), title: "山田様 品川MS", customerId: c1, propertyId: p1, agentId: a1, amount: 76000000, stage: "viewing", nextDate: "", closeDate: "" },
-        { id: uid(), title: "佐藤様 世田谷戸建", customerId: c2, propertyId: p2, agentId: a2, amount: 95000000, stage: "offer", nextDate: "", closeDate: "" },
-        { id: uid(), title: "高橋様 目黒MS", customerId: c3, propertyId: p4, agentId: a2, amount: 61000000, stage: "closed", nextDate: "", closeDate: "2026-06-18" },
-        { id: uid(), title: "旧案件A 中央区MS", customerId: c1, propertyId: "", agentId: a1, amount: 84000000, stage: "closed", nextDate: "", closeDate: "2026-05-09" },
-        { id: uid(), title: "旧案件B 川崎戸建", customerId: c2, propertyId: "", agentId: a1, amount: 52000000, stage: "closed", nextDate: "", closeDate: "2026-04-22" },
-        { id: uid(), title: "旧案件C 横浜MS", customerId: c3, propertyId: "", agentId: a2, amount: 47000000, stage: "closed", nextDate: "", closeDate: "2026-04-05" },
+        { id: uid(), title: "山田様 品川MS", customerId: c1, propertyId: p1, agentId: a1, amount: 76000000, stage: "viewing", createdDate: "2026-06-25", nextDate: "", closeDate: "" },
+        { id: uid(), title: "佐藤様 世田谷戸建", customerId: c2, propertyId: p2, agentId: a2, amount: 95000000, stage: "offer", createdDate: "2026-06-10", nextDate: "", closeDate: "" },
+        { id: uid(), title: "高橋様 目黒MS", customerId: c3, propertyId: p4, agentId: a2, amount: 61000000, stage: "closed", createdDate: "2026-05-20", nextDate: "", closeDate: "2026-06-18" },
+        { id: uid(), title: "旧案件A 中央区MS", customerId: c1, propertyId: "", agentId: a1, amount: 84000000, stage: "closed", createdDate: "2026-04-10", nextDate: "", closeDate: "2026-05-09" },
+        { id: uid(), title: "旧案件B 川崎戸建", customerId: c2, propertyId: "", agentId: a1, amount: 52000000, stage: "closed", createdDate: "2026-03-15", nextDate: "", closeDate: "2026-04-22" },
+        { id: uid(), title: "旧案件C 横浜MS", customerId: c3, propertyId: "", agentId: a2, amount: 47000000, stage: "closed", createdDate: "2026-03-20", nextDate: "", closeDate: "2026-04-05" },
       ],
       viewings: [],
+      settings: { monthlyTarget: 150000000 },
     };
   };
 
@@ -91,6 +92,12 @@
       if (c.minRooms == null) c.minRooms = 0;
       if (c.wish == null) c.wish = "";
     });
+    (d.deals || []).forEach((dl) => {
+      // 旧データにリードタイム算出用の作成日が無ければ補完（成約日→なければ今日）
+      if (dl.createdDate == null || dl.createdDate === "") dl.createdDate = dl.closeDate || todayStr();
+    });
+    if (!d.settings || typeof d.settings !== "object") d.settings = { monthlyTarget: 150000000 };
+    if (d.settings.monthlyTarget == null) d.settings.monthlyTarget = 150000000;
     return d;
   }
 
@@ -702,7 +709,7 @@
       }
       if (v.stage === "closed" && !v.closeDate) v.closeDate = todayStr();
       if (id) Object.assign(d, v);
-      else data.deals.push(Object.assign({ id: uid() }, v));
+      else data.deals.push(Object.assign({ id: uid(), createdDate: todayStr() }, v));
       save(); renderAll(); toast(id ? "商談を更新しました" : "商談を追加しました");
     });
   }
@@ -958,6 +965,8 @@
     ].map((k) => `<div class="kpi ${k.gold ? "gold" : ""}">
         <div class="k-label">${k.label}</div><div class="k-value">${k.value}</div><div class="k-sub">${k.sub}</div></div>`).join("");
 
+    renderTargetMeter(monthSales);
+    renderLeadTime();
     renderBarChart($("#monthlyChart"), monthlySeries(6), { showCount: true });
 
     const rows = agentSalesRows();
@@ -968,6 +977,58 @@
         <td class="num">${r.props}</td><td class="num">${r.count}</td><td class="num">${man(r.amount)}</td>
       </tr>`).join("") || `<tr><td colspan="5" class="empty">営業担当がありません</td></tr>`;
   }
+
+  // 今月の売上目標 達成率メーター
+  function renderTargetMeter(monthSales) {
+    const target = Number((data.settings && data.settings.monthlyTarget) || 0);
+    const pct = target > 0 ? Math.round((monthSales / target) * 100) : 0;
+    const over = pct >= 100;
+    const remain = Math.max(0, target - monthSales);
+    $("#targetMeter").innerHTML = `
+      <div class="meter-figures">
+        <div class="meter-pct ${over ? "over" : "under"}">${target > 0 ? pct + "%" : "—"}</div>
+        <div class="meter-target">今月実績 <b>${man(monthSales)}</b><br>目標 ${target > 0 ? man(target) : "未設定"}</div>
+      </div>
+      <div class="meter-bar"><div class="meter-fill ${over ? "over" : ""}" style="width:${Math.min(100, pct)}%"></div></div>
+      <div class="meter-sub">
+        <span>${over ? "🎉 目標達成！" : target > 0 ? "残り " + man(remain) : "「目標設定」から月次目標を登録してください"}</span>
+        <span>${todayStr().slice(0, 7)}</span>
+      </div>`;
+  }
+
+  // 成約リードタイム（問合せ→成約の日数）
+  function daysBetween(a, b) {
+    const d1 = new Date(a + "T00:00:00"), d2 = new Date(b + "T00:00:00");
+    if (isNaN(d1) || isNaN(d2)) return null;
+    return Math.round((d2 - d1) / 86400000);
+  }
+  function renderLeadTime() {
+    const spans = closedDeals()
+      .map((d) => (d.createdDate && d.closeDate ? daysBetween(d.createdDate, d.closeDate) : null))
+      .filter((n) => n != null && n >= 0);
+    if (!spans.length) {
+      $("#leadTimeStats").innerHTML = `<div class="leadtime-note">成約データ（作成日・成約日）がありません</div>`;
+      return;
+    }
+    const avg = Math.round(spans.reduce((s, n) => s + n, 0) / spans.length);
+    const min = Math.min.apply(null, spans), max = Math.max.apply(null, spans);
+    $("#leadTimeStats").innerHTML = `
+      <div class="lt-stat"><div class="lt-value">${avg}<small> 日</small></div><div class="lt-label">平均リードタイム</div></div>
+      <div class="lt-stat"><div class="lt-value">${min}<small> 日</small></div><div class="lt-label">最短</div></div>
+      <div class="lt-stat"><div class="lt-value">${max}<small> 日</small></div><div class="lt-label">最長</div></div>
+      <div class="leadtime-note">成約 ${spans.length} 件の商談作成日から成約日までの日数を集計</div>`;
+  }
+
+  $("#btnSetTarget").addEventListener("click", () => {
+    modal.open("月次売上目標の設定",
+      [{ name: "monthlyTarget", label: "月次売上目標（円）", type: "number", default: (data.settings && data.settings.monthlyTarget) || 0 }],
+      { monthlyTarget: (data.settings && data.settings.monthlyTarget) || 0 },
+      (v) => {
+        if (!data.settings) data.settings = {};
+        data.settings.monthlyTarget = Number(v.monthlyTarget) || 0;
+        save(); renderAll(); toast("月次目標を更新しました");
+      });
+  });
 
   $("#btnCsvSales").addEventListener("click", () => {
     downloadCSV("担当者別売上-" + todayStr() + ".csv",
