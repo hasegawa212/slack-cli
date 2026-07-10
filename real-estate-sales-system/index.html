@@ -178,11 +178,22 @@
       <div class="view-head">
         <h1 class="view-title">販売レポート</h1>
         <div class="view-head-actions">
+          <button class="btn" id="btnSetTarget" title="月次売上目標を設定">目標設定</button>
           <button class="btn" id="btnCsvSales" title="担当者別売上をCSVで出力">売上CSV</button>
         </div>
       </div>
       <div class="cards" id="reportKpis"></div>
-      <div class="panel-grid">
+      <div class="panel-grid two">
+        <div class="panel">
+          <h2 class="panel-title">今月の売上目標 達成率</h2>
+          <div id="targetMeter" class="meter-wrap"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">成約リードタイム分析（問合せ→成約）</h2>
+          <div id="leadTimeStats" class="leadtime-wrap"></div>
+        </div>
+      </div>
+      <div class="panel-grid" style="margin-top:16px;">
         <div class="panel" style="grid-column: 1 / -1;">
           <h2 class="panel-title">月次成約実績（成約金額）</h2>
           <div id="monthlyChart" class="chart"></div>
